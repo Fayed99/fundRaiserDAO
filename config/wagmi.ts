@@ -1,26 +1,22 @@
-import { base, baseSepolia } from 'wagmi/chains'
-import { createConfig, createStorage, cookieStorage, http } from 'wagmi'
+import { http, createConfig, createStorage, cookieStorage } from 'wagmi'
+import { baseSepolia } from 'wagmi/chains'
 import { coinbaseWallet, injected } from 'wagmi/connectors'
 
-const configuredChainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? baseSepolia.id)
-
-export const appChain = configuredChainId === base.id ? base : baseSepolia
+export const appChain = baseSepolia
 
 export const config = createConfig({
-  chains: [appChain],
+  chains: [baseSepolia],
   connectors: [
     injected(),
     coinbaseWallet({
       appName: 'FundRaiserDAO',
-      preference: 'all',
-      version: '4',
+      preference: 'smartWalletOnly',
     }),
   ],
-  ssr: true,
   storage: createStorage({ storage: cookieStorage }),
+  ssr: true,
   transports: {
-    [base.id]: http(process.env.NEXT_PUBLIC_BASE_RPC_URL ?? 'https://mainnet.base.org'),
-    [baseSepolia.id]: http(process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL ?? 'https://sepolia.base.org'),
+    [baseSepolia.id]: http('https://sepolia.base.org'),
   },
 })
 

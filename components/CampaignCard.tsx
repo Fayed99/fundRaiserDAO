@@ -1,6 +1,7 @@
 'use client'
 
-import { Clock, Image as ImageIcon, MessageCircle, Users } from 'lucide-react'
+import { Image as ImageIcon, MessageCircle, Users } from 'lucide-react'
+import { CampaignStatus } from '@/components/CampaignStatus'
 import type { UiCampaign } from '@/hooks/useCampaigns'
 import { categoryLabel, formatEth, shortAddress } from '@/lib/format'
 
@@ -10,8 +11,6 @@ type CampaignCardProps = {
 }
 
 export function CampaignCard({ campaign, onOpen }: CampaignCardProps) {
-  const urgent = campaign.daysLeft <= 7
-
   return (
     <article className="campaign-card" onClick={() => onOpen(campaign)}>
       <div className="card-image">
@@ -34,8 +33,8 @@ export function CampaignCard({ campaign, onOpen }: CampaignCardProps) {
             <MessageCircle size={12} className="inline-block" /> {campaign.commentCount}
           </span>
         ) : null}
-        <span className={`card-days ${urgent ? 'urgent' : ''}`}>
-          <Clock size={12} className="inline-block" /> {campaign.daysLeft} day{campaign.daysLeft === 1 ? '' : 's'} left
+        <span className="card-days">
+          <CampaignStatus deadline={campaign.deadline} compact />
         </span>
       </div>
 

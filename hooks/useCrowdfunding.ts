@@ -9,7 +9,7 @@ import { CROWDFUNDING_ADDRESS, crowdfundingAbi, isFundraiserConfigured } from '@
 import { appChain, config } from '@/config/wagmi'
 import { useCampaigns, type UiCampaign } from './useCampaigns'
 
-export type CrowdfundingAction = 'create' | 'donate' | 'comment'
+export type CrowdfundingAction = 'create' | 'donate' | 'comment' | 'withdraw'
 
 export type CrowdfundingConfirmation = {
   id: number
@@ -146,6 +146,24 @@ export function useCrowdfunding() {
     [ensureWritable, writeContract],
   )
 
+  const withdrawFunds = useCallback(
+    (campaignId: bigint) => {
+      const issue = ensureWritable()
+      if (issue) return issue
+
+      setPendingAction({ action: 'withdraw', campaignId })
+      writeContract({
+        address: CROWDFUNDING_ADDRESS,
+        abi: crowdfundingAbi,
+        functionName: 'withdraw',
+        args: [campaignId],
+        chainId: appChain.id,
+      })
+      return null
+    },
+    [ensureWritable, writeContract],
+  )
+
   const isTransactionLoading = isSigning || isConfirming || isSwitchingChain
 
   return useMemo(
@@ -154,6 +172,7 @@ export function useCrowdfunding() {
       addComment,
       createProposal,
       donate,
+      withdrawFunds,
       isConfirming,
       isSigning,
       isSwitchingChain,
@@ -167,6 +186,7 @@ export function useCrowdfunding() {
       campaignRead,
       createProposal,
       donate,
+      withdrawFunds,
       isConfirming,
       isSigning,
       isSwitchingChain,

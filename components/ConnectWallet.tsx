@@ -3,6 +3,7 @@
 import { LogOut, Wallet } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
+import { appChain } from '@/config/wagmi'
 
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`
@@ -36,6 +37,13 @@ export function ConnectWallet() {
   }
 
   if (!isConnected) {
+    function connectFresh(connector: (typeof connectors)[number]) {
+      disconnect()
+      window.setTimeout(() => {
+        connect({ connector, chainId: appChain.id })
+      }, 100)
+    }
+
     return (
       <div className="flex w-full max-w-md flex-col gap-3">
         <div className="grid gap-2 sm:grid-cols-2">
@@ -43,7 +51,7 @@ export function ConnectWallet() {
             <button
               className="btn-outline"
               key={connector.uid}
-              onClick={() => connect({ connector })}
+              onClick={() => connectFresh(connector)}
               disabled={isConnecting}
               type="button"
             >

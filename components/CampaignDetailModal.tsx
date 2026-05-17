@@ -4,8 +4,10 @@ import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, MessageCircle, Send, X } from 'lucide-react'
 import { formatEther } from 'viem'
 import { useAccount, useReadContract } from 'wagmi'
+import { CampaignStatus } from '@/components/CampaignStatus'
 import { CROWDFUNDING_ADDRESS, crowdfundingAbi, isFundraiserConfigured } from '@/config/contracts'
 import { appChain } from '@/config/wagmi'
+import { useCountdown } from '@/hooks/useCountdown'
 import type { UiCampaign } from '@/hooks/useCampaigns'
 import { categoryLabel, formatEth, relativeTime, shortAddress } from '@/lib/format'
 
@@ -14,14 +16,16 @@ type CampaignDetailModalProps = {
   onClose: () => void
   onDonate: (campaign: UiCampaign) => void
   addComment: (campaignId: bigint, message: string) => string | null
+  withdrawFunds: (campaignId: bigint) => string | null
   isTransactionLoading: boolean
   notify: (message: string, type?: 'success' | 'error' | 'info') => void
 }
 
-export function CampaignDetailModal({ campaign, onClose, onDonate, addComment, isTransactionLoading, notify }: CampaignDetailModalProps) {
+export function CampaignDetailModal({ campaign, onClose, onDonate, addComment, withdrawFunds, isTransactionLoading, notify }: CampaignDetailModalProps) {
   const [galleryIndex, setGalleryIndex] = useState(0)
   const [comment, setComment] = useState('')
-  const { isConnected } = useAccount()
+  const { address, isConnected } = useAccount()
+  const deadlineCountdown = useCountdown(campaign ? Number(campaign.deadline) : 0)
 
   const { data: comments, refetch: refetchComments } = useReadContract({
     address: CROWDFUNDING_ADDRESS,
@@ -54,11 +58,22 @@ export function CampaignDetailModal({ campaign, onClose, onDonate, addComment, i
     return Number(formatEther(campaign.pledged / BigInt(campaign.backers)))
   }, [campaign])
 
+  const canWithdraw = useMemo(() => {
+    if (!campaign || !address) return false
+
+    const isCreator = address.toLowerCase() === campaign.creator.toLowerCase()
+    const isClaimed = campaign.withdrawn
+    const goalReached = campaign.pledged >= campaign.goal
+    const timeExpired = Boolean(deadlineCountdown && deadlineCountdown.totalSeconds <= 0)
+
+    return isCreator && !isClaimed && (goalReached || timeExpired)
+  }, [address, campaign, deadlineCountdown])
+
   if (!campaign) return null
 
   const images = campaign.images.length > 0 ? [...campaign.images] : [campaign.coverImage]
   const image = images[galleryIndex] || campaign.coverImage
-  const urgent = campaign.daysLeft <= 7
+  const isCreator = Boolean(address && address.toLowerCase() === campaign.creator.toLowerCase())
 
   function handleComment(event: FormEvent) {
     event.preventDefault()
@@ -159,8 +174,7 @@ export function CampaignDetailModal({ campaign, onClose, onDonate, addComment, i
                 <p className="text-xs text-[var(--muted)]">Backers</p>
               </div>
               <div>
-                <p className={`font-display font-bold ${urgent ? 'text-[var(--error)]' : 'text-[var(--fg)]'}`}>{campaign.daysLeft}</p>
-                <p className="text-xs text-[var(--muted)]">Days Left</p>
+                <CampaignStatus deadline={campaign.deadline} />
               </div>
               <div>
                 <p className="font-display font-bold text-[var(--fg)]">{formatEth(averagePledge)} ETH</p>
@@ -169,9 +183,33 @@ export function CampaignDetailModal({ campaign, onClose, onDonate, addComment, i
             </div>
           </div>
 
-          <button className="btn-primary mb-6 w-full py-3 text-base" onClick={() => onDonate(campaign)} type="button">
-            Back This Project
-          </button>
+          {!isCreator ? (
+            <button className="btn-primary mb-6 w-full py-3 text-base" onClick={() => onDonate(campaign)} type="button">
+              Back This Project
+            </button>
+          ) : (
+            campaign.withdrawn ? (
+              <div className="mb-6 rounded-lg border border-[var(--border)] bg-[var(--bg)] p-4 text-center text-sm text-[var(--muted)]">
+                Funds have been withdrawn by creator.
+              </div>
+            ) : canWithdraw ? (
+              <button
+                className="mb-6 w-full rounded-lg bg-emerald-600 py-4 font-bold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isTransactionLoading}
+                onClick={() => {
+                  const issue = withdrawFunds(campaign.id)
+                  if (issue) notify(issue, 'info')
+                }}
+                type="button"
+              >
+                Withdraw {formatEth(campaign.pledgedEth)} ETH
+              </button>
+            ) : (
+              <div className="mb-6 rounded-lg border border-[var(--border)] bg-[var(--bg)] p-4 text-center text-sm text-[var(--muted)]">
+                Withdrawals unlock when the goal is met or the deadline passes.
+              </div>
+            )
+          )}
 
           <div className="mb-6">
             <h3 className="font-display mb-3 text-base font-bold text-[var(--fg)]">Updates</h3>

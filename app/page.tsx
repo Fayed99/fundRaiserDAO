@@ -52,6 +52,7 @@ export default function Home() {
     campaigns,
     createProposal,
     donate,
+    withdrawFunds,
     isError,
     isLoading,
     isTransactionLoading,
@@ -92,6 +93,8 @@ export default function Home() {
       notify('Pledge confirmed on Base.', 'success')
     } else if (lastConfirmation.action === 'comment') {
       notify('Comment posted on Base.', 'success')
+    } else if (lastConfirmation.action === 'withdraw') {
+      notify('Funds withdrawn to creator wallet.', 'success')
     }
 
     setCreateOpen(false)
@@ -134,7 +137,7 @@ export default function Home() {
 
   function connectWallet() {
     const baseConnector = connectors.find((connector) => connector.name.toLowerCase().includes('base'))
-    connect({ connector: baseConnector ?? connectors[0] })
+    connect({ connector: baseConnector ?? connectors[0], chainId: appChain.id })
   }
 
   function openCreate() {
@@ -399,6 +402,7 @@ export default function Home() {
         onClose={() => setSelectedCampaign(null)}
         onDonate={openDonate}
         addComment={addComment}
+        withdrawFunds={withdrawFunds}
         isTransactionLoading={isTransactionLoading}
         notify={notify}
       />
