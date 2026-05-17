@@ -1,6 +1,7 @@
 'use client'
 
 import { LogOut, Wallet } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
 
 function shortAddress(address: string) {
@@ -11,6 +12,20 @@ export function ConnectWallet() {
   const { address, isConnected, isConnecting, isReconnecting } = useAccount()
   const { connect, connectors, error } = useConnect()
   const { disconnect } = useDisconnect()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return (
+      <div
+        className="h-11 w-full max-w-md animate-pulse rounded-lg border border-[var(--border)] bg-[var(--panel)]"
+        aria-hidden="true"
+      />
+    )
+  }
 
   if (isReconnecting) {
     return (

@@ -2,15 +2,13 @@
 
 import { type FormEvent, useEffect, useState } from 'react'
 import { Plus, Trash2, X } from 'lucide-react'
-import { parseEther } from 'viem'
-import { useAccount, useChainId, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
-import { CROWDFUNDING_ADDRESS, crowdfundingAbi, isFundraiserConfigured } from '@/config/contracts'
-import { appChain } from '@/config/wagmi'
+import type { CreateProposalInput } from '@/hooks/useCrowdfunding'
 
 type CreateProposalModalProps = {
   open: boolean
   onClose: () => void
-  onSuccess: () => void
+  createProposal: (input: CreateProposalInput) => string | null
+  isTransactionLoading: boolean
   notify: (message: string, type?: 'success' | 'error' | 'info') => void
 }
 
@@ -23,33 +21,20 @@ const initialForm = {
   description: '',
 }
 
-export function CreateProposalModal({ open, onClose, onSuccess, notify }: CreateProposalModalProps) {
-  const { isConnected } = useAccount()
-  const chainId = useChainId()
-  const { switchChain, isPending: isSwitching } = useSwitchChain()
+export function CreateProposalModal({ open, onClose, createProposal, isTransactionLoading, notify }: CreateProposalModalProps) {
   const [formData, setFormData] = useState(initialForm)
   const [imageInput, setImageInput] = useState('')
   const [images, setImages] = useState<string[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const { data: hash, error, isPending, writeContract } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash })
 
   useEffect(() => {
-    if (isSuccess) {
-      notify('Proposal live on Base.', 'success')
+    if (!open) {
       setFormData(initialForm)
       setImages([])
       setImageInput('')
-      onSuccess()
-      onClose()
+      setErrors({})
     }
-  }, [isSuccess, notify, onClose, onSuccess])
-
-  useEffect(() => {
-    if (error) {
-      notify(error.message, 'error')
-    }
-  }, [error, notify])
+  }, [open])
 
   if (!open) return null
 
@@ -101,35 +86,19 @@ export function CreateProposalModal({ open, onClose, onSuccess, notify }: Create
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    if (!isConnected) {
-      notify('Connect your wallet first.', 'info')
-      return
-    }
-    if (!isFundraiserConfigured) {
-      notify('Set NEXT_PUBLIC_FUNDRAISER_ADDRESS before creating proposals.', 'error')
-      return
-    }
-    if (chainId !== appChain.id) {
-      switchChain({ chainId: appChain.id })
-      return
-    }
+    if (isTransactionLoading) return
     if (!validate()) return
 
-    writeContract({
-      address: CROWDFUNDING_ADDRESS,
-      abi: crowdfundingAbi,
-      functionName: 'createCampaign',
-      args: [
-        formData.title.trim(),
-        formData.shortDescription.trim(),
-        formData.description.trim(),
-        formData.category,
-        images,
-        parseEther(formData.goal),
-        BigInt(formData.duration),
-      ],
-      chainId: appChain.id,
+    const issue = createProposal({
+      title: formData.title.trim(),
+      shortDescription: formData.shortDescription.trim(),
+      description: formData.description.trim(),
+      category: formData.category,
+      images,
+      goal: formData.goal,
+      duration: formData.duration,
     })
+    if (issue) notify(issue, 'info')
   }
 
   return (
@@ -250,19 +219,11 @@ export function CreateProposalModal({ open, onClose, onSuccess, notify }: Create
           </div>
 
           <div className="mt-8 flex gap-3">
-            <button className="btn-outline flex-1" onClick={onClose} type="button">
+            <button className="btn-outline flex-1" disabled={isTransactionLoading} onClick={onClose} type="button">
               Cancel
             </button>
-            <button className="btn-primary flex-1" disabled={isPending || isConfirming || isSwitching} type="submit">
-              {chainId !== appChain.id
-                ? isSwitching
-                  ? 'Switching...'
-                  : `Switch to ${appChain.name}`
-                : isPending
-                  ? 'Confirm in Wallet...'
-                  : isConfirming
-                    ? 'Publishing to Base...'
-                    : 'Submit Proposal'}
+            <button className="btn-primary flex-1" disabled={isTransactionLoading} type="submit">
+              {isTransactionLoading ? 'Processing...' : 'Submit Proposal'}
             </button>
           </div>
         </form>

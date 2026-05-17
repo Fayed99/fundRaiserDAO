@@ -2,9 +2,9 @@
 
 import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, MessageCircle, Send, X } from 'lucide-react'
-import { formatEther, parseEther } from 'viem'
-import { useAccount, useChainId, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
-import { CROWDFUNDING_ADDRESS, crowdfundingAbi } from '@/config/contracts'
+import { formatEther } from 'viem'
+import { useAccount, useReadContract } from 'wagmi'
+import { CROWDFUNDING_ADDRESS, crowdfundingAbi, isFundraiserConfigured } from '@/config/contracts'
 import { appChain } from '@/config/wagmi'
 import type { UiCampaign } from '@/hooks/useCampaigns'
 import { categoryLabel, formatEth, relativeTime, shortAddress } from '@/lib/format'
@@ -13,18 +13,15 @@ type CampaignDetailModalProps = {
   campaign: UiCampaign | null
   onClose: () => void
   onDonate: (campaign: UiCampaign) => void
-  onSuccess: () => void
+  addComment: (campaignId: bigint, message: string) => string | null
+  isTransactionLoading: boolean
   notify: (message: string, type?: 'success' | 'error' | 'info') => void
 }
 
-export function CampaignDetailModal({ campaign, onClose, onDonate, onSuccess, notify }: CampaignDetailModalProps) {
+export function CampaignDetailModal({ campaign, onClose, onDonate, addComment, isTransactionLoading, notify }: CampaignDetailModalProps) {
   const [galleryIndex, setGalleryIndex] = useState(0)
   const [comment, setComment] = useState('')
   const { isConnected } = useAccount()
-  const chainId = useChainId()
-  const { switchChain, isPending: isSwitching } = useSwitchChain()
-  const { data: hash, error, isPending, writeContract } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash })
 
   const { data: comments, refetch: refetchComments } = useReadContract({
     address: CROWDFUNDING_ADDRESS,
@@ -32,7 +29,7 @@ export function CampaignDetailModal({ campaign, onClose, onDonate, onSuccess, no
     functionName: 'getComments',
     args: campaign ? [campaign.id] : undefined,
     chainId: appChain.id,
-    query: { enabled: Boolean(campaign) },
+    query: { enabled: Boolean(campaign && isFundraiserConfigured) },
   })
 
   const { data: updates, refetch: refetchUpdates } = useReadContract({
@@ -41,27 +38,16 @@ export function CampaignDetailModal({ campaign, onClose, onDonate, onSuccess, no
     functionName: 'getUpdates',
     args: campaign ? [campaign.id] : undefined,
     chainId: appChain.id,
-    query: { enabled: Boolean(campaign) },
+    query: { enabled: Boolean(campaign && isFundraiserConfigured) },
   })
 
   useEffect(() => {
     setGalleryIndex(0)
     setComment('')
-  }, [campaign?.id])
-
-  useEffect(() => {
-    if (isSuccess) {
-      notify('Comment posted on Base.', 'success')
-      setComment('')
-      refetchComments()
-      refetchUpdates()
-      onSuccess()
-    }
-  }, [isSuccess, notify, onSuccess, refetchComments, refetchUpdates])
-
-  useEffect(() => {
-    if (error) notify(error.message, 'error')
-  }, [error, notify])
+    if (!campaign) return
+    refetchComments()
+    refetchUpdates()
+  }, [campaign?.id, refetchComments, refetchUpdates])
 
   const averagePledge = useMemo(() => {
     if (!campaign || campaign.backers === 0) return 0
@@ -81,10 +67,7 @@ export function CampaignDetailModal({ campaign, onClose, onDonate, onSuccess, no
       notify('Connect your wallet to comment.', 'info')
       return
     }
-    if (chainId !== appChain.id) {
-      switchChain({ chainId: appChain.id })
-      return
-    }
+    if (isTransactionLoading) return
     const message = comment.trim()
     if (!message) {
       notify('Write a comment first.', 'error')
@@ -94,13 +77,8 @@ export function CampaignDetailModal({ campaign, onClose, onDonate, onSuccess, no
       notify('Comment must be 500 characters or less.', 'error')
       return
     }
-    writeContract({
-      address: CROWDFUNDING_ADDRESS,
-      abi: crowdfundingAbi,
-      functionName: 'addComment',
-      args: [campaign.id, message],
-      chainId: appChain.id,
-    })
+    const issue = addComment(campaign.id, message)
+    if (issue) notify(issue, 'info')
   }
 
   return (
@@ -230,7 +208,7 @@ export function CampaignDetailModal({ campaign, onClose, onDonate, onSuccess, no
                   rows={1}
                   value={comment}
                 />
-                <button className="comment-send" disabled={isPending || isConfirming || isSwitching} type="submit" aria-label="Send comment">
+                <button className="comment-send" disabled={isTransactionLoading} type="submit" aria-label="Send comment">
                   <Send size={16} />
                 </button>
               </form>

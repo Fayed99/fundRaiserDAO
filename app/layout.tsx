@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next'
+import { headers } from 'next/headers'
 import { Providers } from './providers'
 import './globals.css'
 
@@ -21,11 +22,13 @@ export const viewport: Viewport = {
   themeColor: '#0a0a0a',
 }
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const cookie = (await headers()).get('cookie') ?? undefined
+
   return (
     <html lang="en">
       <body>
-        <Providers>{children}</Providers>
+        <Providers cookie={cookie}>{children}</Providers>
       </body>
     </html>
   )

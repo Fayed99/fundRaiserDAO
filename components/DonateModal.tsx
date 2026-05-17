@@ -2,30 +2,22 @@
 
 import { type FormEvent, useEffect, useState } from 'react'
 import { Check, X } from 'lucide-react'
-import { parseEther } from 'viem'
-import { useAccount, useChainId, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
-import { CROWDFUNDING_ADDRESS, crowdfundingAbi } from '@/config/contracts'
-import { appChain } from '@/config/wagmi'
 import type { UiCampaign } from '@/hooks/useCampaigns'
 import { formatEth } from '@/lib/format'
 
 type DonateModalProps = {
   campaign: UiCampaign | null
   onClose: () => void
-  onSuccess: () => void
+  donate: (campaignId: bigint, amount: string, comment?: string) => string | null
+  isTransactionLoading: boolean
   notify: (message: string, type?: 'success' | 'error' | 'info') => void
 }
 
 const presets = ['0.001', '0.005', '0.01', '0.05', '0.1']
 
-export function DonateModal({ campaign, onClose, onSuccess, notify }: DonateModalProps) {
-  const { isConnected } = useAccount()
-  const chainId = useChainId()
-  const { switchChain, isPending: isSwitching } = useSwitchChain()
+export function DonateModal({ campaign, onClose, donate, isTransactionLoading, notify }: DonateModalProps) {
   const [amount, setAmount] = useState('0.005')
   const [comment, setComment] = useState('')
-  const { data: hash, error, isPending, writeContract } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash })
 
   useEffect(() => {
     if (campaign) {
@@ -34,31 +26,12 @@ export function DonateModal({ campaign, onClose, onSuccess, notify }: DonateModa
     }
   }, [campaign])
 
-  useEffect(() => {
-    if (isSuccess) {
-      notify('Pledge confirmed on Base.', 'success')
-      onSuccess()
-      onClose()
-    }
-  }, [isSuccess, notify, onClose, onSuccess])
-
-  useEffect(() => {
-    if (error) notify(error.message, 'error')
-  }, [error, notify])
-
   if (!campaign) return null
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
     if (!campaign) return
-    if (!isConnected) {
-      notify('Connect your wallet first.', 'info')
-      return
-    }
-    if (chainId !== appChain.id) {
-      switchChain({ chainId: appChain.id })
-      return
-    }
+    if (isTransactionLoading) return
     const numericAmount = Number(amount)
     if (!numericAmount || numericAmount <= 0) {
       notify('Enter a valid pledge amount.', 'error')
@@ -70,14 +43,8 @@ export function DonateModal({ campaign, onClose, onSuccess, notify }: DonateModa
       return
     }
 
-    writeContract({
-      address: CROWDFUNDING_ADDRESS,
-      abi: crowdfundingAbi,
-      functionName: message ? 'pledgeWithComment' : 'pledge',
-      args: message ? [campaign.id, message] : [campaign.id],
-      value: parseEther(amount),
-      chainId: appChain.id,
-    })
+    const issue = donate(campaign.id, amount, message)
+    if (issue) notify(issue, 'info')
   }
 
   return (
@@ -145,17 +112,9 @@ export function DonateModal({ campaign, onClose, onSuccess, notify }: DonateModa
             <span className="font-display text-xl font-extrabold text-[var(--accent)]">{amount || '0'} ETH</span>
           </div>
 
-          <button className="btn-primary w-full py-3 text-base" disabled={isPending || isConfirming || isSwitching} type="submit">
+          <button className="btn-primary w-full py-3 text-base" disabled={isTransactionLoading} type="submit">
             <Check size={17} />
-            {chainId !== appChain.id
-              ? isSwitching
-                ? 'Switching...'
-                : `Switch to ${appChain.name}`
-              : isPending
-                ? 'Confirm in Wallet...'
-                : isConfirming
-                  ? 'Confirming on Base...'
-                  : 'Confirm Pledge'}
+            {isTransactionLoading ? 'Processing...' : 'Confirm Pledge'}
           </button>
         </form>
       </div>

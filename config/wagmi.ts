@@ -1,6 +1,6 @@
-import { baseAccount, injected } from 'wagmi/connectors'
 import { base, baseSepolia } from 'wagmi/chains'
 import { createConfig, createStorage, cookieStorage, http } from 'wagmi'
+import { coinbaseWallet, injected } from 'wagmi/connectors'
 
 const configuredChainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? baseSepolia.id)
 
@@ -10,8 +10,10 @@ export const config = createConfig({
   chains: [appChain],
   connectors: [
     injected(),
-    baseAccount({
+    coinbaseWallet({
       appName: 'FundRaiserDAO',
+      preference: 'all',
+      version: '4',
     }),
   ],
   ssr: true,

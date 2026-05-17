@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   BookOpen,
   ChevronDown,
@@ -28,7 +28,7 @@ import { DonationCart, type DonationCartItem } from '@/components/DonationCart'
 import { DonateModal } from '@/components/DonateModal'
 import { Toasts, type ToastState } from '@/components/Toast'
 import { appChain } from '@/config/wagmi'
-import { useCampaigns, type UiCampaign } from '@/hooks/useCampaigns'
+import { useCrowdfunding, type UiCampaign } from '@/hooks/useCrowdfunding'
 import { formatEth, shortAddress } from '@/lib/format'
 
 const categories = [
@@ -47,7 +47,20 @@ export default function Home() {
   const { address, isConnected, isConnecting, isReconnecting } = useAccount()
   const { connect, connectors } = useConnect()
   const { disconnect } = useDisconnect()
-  const { campaigns, isLoading, isError, error, refetch, isConfigured } = useCampaigns()
+  const {
+    addComment,
+    campaigns,
+    createProposal,
+    donate,
+    isError,
+    isLoading,
+    isTransactionLoading,
+    error,
+    lastConfirmation,
+    lastError,
+    refetch,
+    isConfigured,
+  } = useCrowdfunding()
   const [activeFilter, setActiveFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortMode>('trending')
@@ -56,6 +69,7 @@ export default function Home() {
   const [donateCampaign, setDonateCampaign] = useState<UiCampaign | null>(null)
   const [cartItems, setCartItems] = useState<DonationCartItem[]>([])
   const [toasts, setToasts] = useState<ToastState[]>([])
+  const [mounted, setMounted] = useState(false)
 
   const notify = useCallback((message: string, type: ToastState['type'] = 'success') => {
     const id = Date.now()
@@ -64,6 +78,30 @@ export default function Home() {
       setToasts((current) => current.filter((toast) => toast.id !== id))
     }, 3800)
   }, [])
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!lastConfirmation) return
+
+    if (lastConfirmation.action === 'create') {
+      notify('Proposal live on Base.', 'success')
+    } else if (lastConfirmation.action === 'donate') {
+      notify('Pledge confirmed on Base.', 'success')
+    } else if (lastConfirmation.action === 'comment') {
+      notify('Comment posted on Base.', 'success')
+    }
+
+    setCreateOpen(false)
+    setSelectedCampaign(null)
+    setDonateCampaign(null)
+  }, [lastConfirmation, notify])
+
+  useEffect(() => {
+    if (lastError) notify(lastError.message, 'error')
+  }, [lastError, notify])
 
   const filteredCampaigns = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -102,7 +140,6 @@ export default function Home() {
   function openCreate() {
     if (!isConnected) {
       notify('Connect your wallet first.', 'info')
-      connectWallet()
       return
     }
     setCreateOpen(true)
@@ -146,7 +183,12 @@ export default function Home() {
             </nav>
           </div>
           <div className="flex items-center gap-3">
-            {isConnected ? (
+            {!mounted ? (
+              <div className="btn-outline min-w-[132px] text-sm opacity-70" aria-hidden="true">
+                <Wallet size={15} />
+                Connecting...
+              </div>
+            ) : isConnected ? (
               <button className="btn-outline text-sm" onClick={() => disconnect()} type="button">
                 <span className="wallet-dot" />
                 {shortAddress(address)}
@@ -345,9 +387,28 @@ export default function Home() {
         </div>
       </footer>
 
-      <CreateProposalModal open={createOpen} onClose={() => setCreateOpen(false)} onSuccess={() => refetch()} notify={notify} />
-      <CampaignDetailModal campaign={selectedCampaign} onClose={() => setSelectedCampaign(null)} onDonate={openDonate} onSuccess={() => refetch()} notify={notify} />
-      <DonateModal campaign={donateCampaign} onClose={() => setDonateCampaign(null)} onSuccess={() => refetch()} notify={notify} />
+      <CreateProposalModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        createProposal={createProposal}
+        isTransactionLoading={isTransactionLoading}
+        notify={notify}
+      />
+      <CampaignDetailModal
+        campaign={selectedCampaign}
+        onClose={() => setSelectedCampaign(null)}
+        onDonate={openDonate}
+        addComment={addComment}
+        isTransactionLoading={isTransactionLoading}
+        notify={notify}
+      />
+      <DonateModal
+        campaign={donateCampaign}
+        onClose={() => setDonateCampaign(null)}
+        donate={donate}
+        isTransactionLoading={isTransactionLoading}
+        notify={notify}
+      />
       <DonationCart items={cartItems} setItems={setCartItems} onSuccess={() => refetch()} notify={notify} />
     </>
   )

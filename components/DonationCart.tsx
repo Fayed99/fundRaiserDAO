@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Layers, ShoppingBasket, X } from 'lucide-react'
 import { encodeFunctionData, parseEther } from 'viem'
 import { useAccount, useChainId, useSendCalls, useSwitchChain, useWaitForCallsStatus } from 'wagmi'
@@ -27,9 +27,10 @@ export function DonationCart({ items, setItems, onSuccess, notify }: DonationCar
   const chainId = useChainId()
   const { switchChain, isPending: isSwitching } = useSwitchChain()
   const { supportsBatching, supportsPaymaster, paymasterCapabilities } = useWalletCapabilities()
-  const { data, error, isPending, sendCalls } = useSendCalls()
+  const { data, error, isPending, reset, sendCalls } = useSendCalls()
   const { isLoading: isConfirming, isSuccess } = useWaitForCallsStatus({ id: data?.id })
   const [open, setOpen] = useState(false)
+  const handledStatusId = useRef<string | null>(null)
 
   const total = useMemo(() => items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0), [items])
 
@@ -38,12 +39,14 @@ export function DonationCart({ items, setItems, onSuccess, notify }: DonationCar
   }, [items.length])
 
   useEffect(() => {
-    if (isSuccess) {
+    if (isSuccess && data?.id && handledStatusId.current !== data.id) {
+      handledStatusId.current = data.id
       notify('Batch donations confirmed on Base.', 'success')
       setItems([])
       onSuccess()
+      reset()
     }
-  }, [isSuccess, notify, onSuccess, setItems])
+  }, [data?.id, isSuccess, notify, onSuccess, reset, setItems])
 
   useEffect(() => {
     if (error) notify(error.message, 'error')
