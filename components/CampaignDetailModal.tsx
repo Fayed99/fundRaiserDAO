@@ -201,16 +201,18 @@ export function CampaignDetailModal({ campaign, onClose, onDonate, addComment, i
             {isConnected ? (
               <form className="comment-input-wrap" onSubmit={handleComment}>
                 <div className="comment-avatar">You</div>
-                <textarea
-                  className="form-input"
-                  onChange={(event) => setComment(event.target.value)}
-                  placeholder="Share your thoughts on this proposal..."
-                  rows={1}
-                  value={comment}
-                />
-                <button className="comment-send" disabled={isTransactionLoading} type="submit" aria-label="Send comment">
-                  <Send size={16} />
-                </button>
+                <div className="comment-field">
+                  <textarea
+                    className="form-input"
+                    onChange={(event) => setComment(event.target.value)}
+                    placeholder="Share your thoughts on this proposal..."
+                    rows={1}
+                    value={comment}
+                  />
+                  <button className="comment-send" disabled={isTransactionLoading} type="submit" aria-label="Send comment" title="Send comment">
+                    <Send size={20} />
+                  </button>
+                </div>
               </form>
             ) : (
               <p className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-4 text-center text-sm text-[var(--muted)]">
