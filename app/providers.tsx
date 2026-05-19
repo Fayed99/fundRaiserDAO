@@ -10,7 +10,7 @@ export function Providers({ children, cookie }: { children: ReactNode; cookie?: 
   const initialState = cookieToInitialState(config, cookie)
 
   return (
-    <WagmiProvider config={config} initialState={initialState}>
+    <WagmiProvider config={config} initialState={initialState} reconnectOnMount>
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     </WagmiProvider>
   )

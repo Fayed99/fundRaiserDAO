@@ -1,17 +1,22 @@
 import { http, createConfig, createStorage, cookieStorage } from 'wagmi'
 import { baseSepolia } from 'wagmi/chains'
-import { coinbaseWallet, injected } from 'wagmi/connectors'
+import { baseAccount, coinbaseWallet, injected } from 'wagmi/connectors'
 
 export const appChain = baseSepolia
 
 export const config = createConfig({
   chains: [baseSepolia],
+  multiInjectedProviderDiscovery: false,
   connectors: [
-    injected(),
+    baseAccount({
+      appName: 'FundRaiserDAO',
+    }),
     coinbaseWallet({
       appName: 'FundRaiserDAO',
-      preference: 'smartWalletOnly',
+      version: '4',
+      preference: 'all',
     }),
+    injected(),
   ],
   storage: createStorage({ storage: cookieStorage }),
   ssr: true,

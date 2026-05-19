@@ -136,8 +136,18 @@ export default function Home() {
   const totalBackers = useMemo(() => campaigns.reduce((sum, campaign) => sum + campaign.backers, 0), [campaigns])
 
   function connectWallet() {
-    const baseConnector = connectors.find((connector) => connector.name.toLowerCase().includes('base'))
-    connect({ connector: baseConnector ?? connectors[0], chainId: appChain.id })
+    const baseConnector = connectors.find((connector) => connector.id === 'baseAccount')
+    const coinbaseConnector = connectors.find((connector) => connector.id === 'coinbaseWalletSDK')
+    const connector = baseConnector ?? coinbaseConnector ?? connectors[0]
+    if (!connector) {
+      notify('No wallet connector available.', 'error')
+      return
+    }
+
+    disconnect()
+    window.setTimeout(() => {
+      connect({ connector, chainId: appChain.id })
+    }, 100)
   }
 
   function openCreate() {
